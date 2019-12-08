@@ -5,6 +5,10 @@ import os.path
 import sys
 
 from docutils import core
+from contextlib import contextmanager
+import rst2html5_
+
+rst2html5_.register_directives()
 
 # If Python 3, get a binary STDOUT
 if sys.version_info >= (3,):
@@ -12,6 +16,15 @@ if sys.version_info >= (3,):
 
 # Make STDOUT utf-8
 sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
 
 def main(argv=None):
     # Some sanity checks on if the path exists.
@@ -27,20 +40,26 @@ def main(argv=None):
     overrides = {
         'initial_header_level': 1,
         'halt_level': 5,
+        'strip_comments': 'true',
     }
 
-    parts = core.publish_parts(
-        source=page_string,
-        source_path=filepath,
-        writer_name='html',
-        settings_overrides=overrides,
-    )
+    # change directory to the directory containing the file
+    # to pick up stylesheets etc having relative paths
+    with cd(os.path.dirname(filepath)):
 
-    html_document = parts['html_body']
-    html_document = html_document.replace('\ufeff', '')
+        parts = core.publish_parts(
+            source=page_string,
+            source_path=filepath,
+            writer_name='html5',
+            writer=rst2html5_.HTML5Writer(),
+            settings_overrides=overrides,
+        )
 
-    # the REAL print function in python 2, now... see top of file
-    print(html_document)
+        html_document = parts['whole']
+        html_document = html_document.replace('\ufeff', '')
+
+        # the REAL print function in python 2, now... see top of file
+        print(html_document)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
